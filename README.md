@@ -7,6 +7,23 @@ OSKC is a modular Python application that safely pulls photos/videos from your A
 
 ---
 
+### 📱 Phone Setup (First Time Only)
+Before you start, you must enable **USB Debugging** on your phone:
+
+1.  **Unlock Developer Mode:**
+    * Go to **Settings > About Phone**.
+    * Find **"Build Number"** (sometimes under Software Information).
+    * Tap it **7 times fast** until it says "You are now a developer!".
+2.  **Enable USB Debugging:**
+    * Go back to **Settings > System > Developer Options**.
+    * Scroll down and toggle **ON** "USB Debugging".
+3.  **Authorize the PC:**
+    * Connect your phone to the PC via USB.
+    * Look at your phone screen. A popup will ask **"Allow USB Debugging?"**.
+    * Check **"Always allow from this computer"** and tap **Allow**.
+
+---
+
 ### 🚀 How to Run
 
 #### Option A: The Executable (Recommended)
@@ -40,15 +57,6 @@ If you are a new user or running this on a new phone for the first time, follow 
     Use the dedicated **"🛡 Verify & Cleanup"** button. It performs a deep scan to match files on your phone against your PC backup (checking name AND file size) before letting you delete anything.
 
 ---
-
-### ✨ Features
-
-* **Smart Sort:** Automatically organizes flat camera folders into neat `YYYY-MM` directories on your PC based on the file's original timestamp.
-* **Zero-Risk Sync:** Skips files that already exist on the PC to save time.
-* **Verify & Free Space:** A specialized tool to verify backups and mass-delete *only* safe files from the phone.
-* **Advanced Filters:** Filter files by Date Range or Filename (e.g., only copy files starting with 'A' through 'F').
-* **Live Status:** Real-time USB connection monitoring (detects Unauthorized/Offline states).
-* **Portable:** Can auto-detect `adb.exe` if placed in the root folder, making it fully portable on a USB stick.
 
 ### 🛠️ Building the .exe
 If you want to build the executable yourself (requires `pyinstaller`):
