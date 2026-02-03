@@ -17,14 +17,20 @@ class AdbWrapper:
         if self.debug and self.logger:
             self.logger(f"[DEBUG] CMD: {' '.join(cmd)}")
             
-        return subprocess.run(
-            cmd, 
-            capture_output=True, 
-            text=True, 
-            encoding='utf-8', 
-            errors='replace', 
-            startupinfo=startupinfo
-        )
+        try:
+            return subprocess.run(
+                cmd, 
+                capture_output=True, 
+                text=True, 
+                encoding='utf-8', 
+                errors='replace', 
+                startupinfo=startupinfo
+            )
+        except FileNotFoundError:
+            # Graceful fail if adb.exe is missing/path is wrong
+            return subprocess.CompletedProcess(args, 1, stdout="", stderr="ADB binary not found")
+        except Exception as e:
+            return subprocess.CompletedProcess(args, 1, stdout="", stderr=str(e))
 
     def remote_exists(self, path):
         """Checks if a path exists on the device."""

@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import queue
 import os
+import sys  # <--- Added for PyInstaller support
 import datetime
 import random
 
@@ -24,7 +25,7 @@ FALLBACK_PATHS = [
 class OSKCommanderPro(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("OberSturmKlippCommander v6.3") # <-- UNIFIED NAME
+        self.title("OberSturmKlippCommander v6.4 (Bundled)")
         self.geometry("700x750")
         
         if not os.path.exists("logs"): os.makedirs("logs")
@@ -49,19 +50,54 @@ class OSKCommanderPro(tk.Tk):
         # Start loops
         self.after(500, self.startup_checks)
         self.after(100, self._process_queue)
-        self.after(1000, self.monitor_usb) # Start USB polling
+        self.after(1000, self.monitor_usb)
 
     def ensure_adb(self):
-        if not self.settings.get("adb_path"):
+        """
+        Smart ADB Resolution:
+        1. Check PyInstaller Bundle (_MEIPASS)
+        2. Check Local Directory (Portable Mode)
+        3. Respect User Setting (if explicitly set to a valid file)
+        4. Fallback to System PATH ("adb")
+        """
+        
+        # 1. Detect Bundled/Local Binary
+        preferred_adb = None
+        
+        # Check PyInstaller temp folder (Priority 1)
+        if getattr(sys, 'frozen', False):
+            bundle_path = os.path.join(sys._MEIPASS, "adb.exe")
+            if os.path.exists(bundle_path):
+                preferred_adb = bundle_path
+        
+        # Check Script/Exe Directory (Priority 2)
+        if not preferred_adb:
+            local_path = os.path.abspath("adb.exe")
+            if os.path.exists(local_path):
+                preferred_adb = local_path
+
+        # 2. Check User Setting
+        current_setting = self.settings.get("adb_path", "")
+        
+        # Logic: If we found a Bundled/Local binary, we force it IF:
+        # - The user setting is empty
+        # - The user setting is just the generic "adb" string
+        # - The user setting points to a file that no longer exists
+        
+        if preferred_adb:
+            if not current_setting or current_setting == "adb" or not os.path.exists(current_setting):
+                self.settings["adb_path"] = preferred_adb
+                return
+
+        # 3. Fallback
+        if not current_setting:
             self.settings["adb_path"] = "adb"
 
     def monitor_usb(self):
-        """Polls ADB every 2 seconds to check connection status."""
         state = self.adb.get_state()
         
         if state == "Connected":
             self.lbl_usb_status.config(text="USB: Connected", foreground="green")
-            # Only enable start if worker isn't running
             if not self.worker:
                 self.btn_start.config(state="normal")
         elif state == "Unauthorized":
@@ -69,6 +105,9 @@ class OSKCommanderPro(tk.Tk):
             if not self.worker: self.btn_start.config(state="disabled")
         elif state == "Offline":
             self.lbl_usb_status.config(text="USB: Offline (Cable issue?)", foreground="red")
+            if not self.worker: self.btn_start.config(state="disabled")
+        elif state == "Error":
+            self.lbl_usb_status.config(text="USB: Error (ADB Missing?)", foreground="red")
             if not self.worker: self.btn_start.config(state="disabled")
         else:
             self.lbl_usb_status.config(text="USB: No Device", foreground="red")
@@ -81,13 +120,9 @@ class OSKCommanderPro(tk.Tk):
 
     def check_remote_path_fallback(self):
         current_path = self.remote_var.get().strip()
-        # 1. Check if ADB works first
         if self.adb.get_state() != "Connected": return
-
-        # 2. Check current path
         if self.adb.remote_exists(current_path): return
 
-        # 3. Current failed, try fallbacks
         self.log_msg(f"[WARN] Path not found: {current_path}. Searching fallbacks...")
         found = None
         for path in FALLBACK_PATHS:
@@ -112,16 +147,12 @@ class OSKCommanderPro(tk.Tk):
         top = ttk.Frame(main)
         top.pack(fill="x", pady=5)
         
-        # Left: Title
         ttk.Label(top, text="OberSturmKlippCommander", font=("Segoe UI", 12, "bold")).pack(side="left")
         
-        # Right: USB Status & Buttons
         b_fr = ttk.Frame(top)
         b_fr.pack(side="right")
-        
         self.lbl_usb_status = ttk.Label(b_fr, text="Checking USB...", font=("Segoe UI", 9, "bold"), foreground="gray")
         self.lbl_usb_status.pack(side="left", padx=(0, 15))
-        
         ttk.Button(b_fr, text="⚙ Settings", command=self.open_settings).pack(side="left", padx=2)
         ttk.Button(b_fr, text="🛡 Verify & Cleanup", command=self.open_cleanup).pack(side="left")
         
@@ -144,10 +175,8 @@ class OSKCommanderPro(tk.Tk):
         
         ctrl = ttk.Frame(main, padding=10)
         ctrl.pack(fill="x")
-        
         self.btn_start = ttk.Button(ctrl, text="START", command=self.start)
         self.btn_start.pack(side="left", fill="x", expand=True, padx=5)
-        
         self.btn_stop = ttk.Button(ctrl, text="STOP", command=self.stop, state="disabled")
         self.btn_stop.pack(side="right", fill="x", expand=True, padx=5)
 
@@ -164,7 +193,6 @@ class OSKCommanderPro(tk.Tk):
         # Log
         log_fr = ttk.LabelFrame(main, text="Log", padding=5)
         log_fr.pack(fill="both", expand=True)
-        
         log_tools = ttk.Frame(log_fr)
         log_tools.pack(fill="x", pady=(0, 2))
         ttk.Button(log_tools, text="Copy Log", command=self.copy_log, width=10).pack(side="right", padx=2)
@@ -206,7 +234,6 @@ class OSKCommanderPro(tk.Tk):
         self.canvas.coords(self.icon_id, self.base_x, self.base_y - 30)
         self.after(600, lambda: self.canvas.coords(self.icon_id, self.base_x, self.base_y))
 
-    # App Logic
     def browse_dest(self):
         d = filedialog.askdirectory()
         if d: self.local_var.set(d)
@@ -218,7 +245,6 @@ class OSKCommanderPro(tk.Tk):
         if dlg.result:
             self.settings.update(dlg.result)
             save_settings(self.settings)
-            # Re-init main adb wrapper in case path changed
             self.adb = AdbWrapper(self.settings["adb_path"])
 
     def open_cleanup(self):
@@ -241,7 +267,6 @@ class OSKCommanderPro(tk.Tk):
 
         self.settings["remote_path"] = self.remote_var.get()
         self.settings["last_dest"] = self.local_var.get()
-        
         CleanupDialog(self, self.settings, file_logger)
 
     def log_msg(self, msg):
@@ -269,7 +294,6 @@ class OSKCommanderPro(tk.Tk):
     def start(self):
         self.jump()
         self.check_remote_path_fallback()
-        
         dest = self.local_var.get()
         if not dest: return
         
