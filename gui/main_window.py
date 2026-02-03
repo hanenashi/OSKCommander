@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import queue
 import os
-import sys  # <--- Added for PyInstaller support
+import sys
 import datetime
 import random
 
@@ -25,7 +25,7 @@ FALLBACK_PATHS = [
 class OSKCommanderPro(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("OberSturmKlippCommander v6.4 (Bundled)")
+        self.title("OberSturmKlippCommander v6.5 (Release Candidate)")
         self.geometry("700x750")
         
         if not os.path.exists("logs"): os.makedirs("logs")
@@ -52,44 +52,36 @@ class OSKCommanderPro(tk.Tk):
         self.after(100, self._process_queue)
         self.after(1000, self.monitor_usb)
 
+    def resource_path(self, relative_path):
+        """ Get absolute path to resource, works for dev and for PyInstaller """
+        try:
+            # PyInstaller creates a temp folder and stores path in _MEIPASS
+            base_path = sys._MEIPASS
+        except Exception:
+            base_path = os.path.abspath(".")
+        return os.path.join(base_path, relative_path)
+
     def ensure_adb(self):
-        """
-        Smart ADB Resolution:
-        1. Check PyInstaller Bundle (_MEIPASS)
-        2. Check Local Directory (Portable Mode)
-        3. Respect User Setting (if explicitly set to a valid file)
-        4. Fallback to System PATH ("adb")
-        """
-        
-        # 1. Detect Bundled/Local Binary
+        # 1. Check PyInstaller Bundle (_MEIPASS)
         preferred_adb = None
-        
-        # Check PyInstaller temp folder (Priority 1)
         if getattr(sys, 'frozen', False):
             bundle_path = os.path.join(sys._MEIPASS, "adb.exe")
             if os.path.exists(bundle_path):
                 preferred_adb = bundle_path
         
-        # Check Script/Exe Directory (Priority 2)
+        # Check Local Directory
         if not preferred_adb:
             local_path = os.path.abspath("adb.exe")
             if os.path.exists(local_path):
                 preferred_adb = local_path
 
-        # 2. Check User Setting
         current_setting = self.settings.get("adb_path", "")
-        
-        # Logic: If we found a Bundled/Local binary, we force it IF:
-        # - The user setting is empty
-        # - The user setting is just the generic "adb" string
-        # - The user setting points to a file that no longer exists
         
         if preferred_adb:
             if not current_setting or current_setting == "adb" or not os.path.exists(current_setting):
                 self.settings["adb_path"] = preferred_adb
                 return
 
-        # 3. Fallback
         if not current_setting:
             self.settings["adb_path"] = "adb"
 
@@ -193,6 +185,7 @@ class OSKCommanderPro(tk.Tk):
         # Log
         log_fr = ttk.LabelFrame(main, text="Log", padding=5)
         log_fr.pack(fill="both", expand=True)
+        
         log_tools = ttk.Frame(log_fr)
         log_tools.pack(fill="x", pady=(0, 2))
         ttk.Button(log_tools, text="Copy Log", command=self.copy_log, width=10).pack(side="right", padx=2)
@@ -203,8 +196,10 @@ class OSKCommanderPro(tk.Tk):
 
     def load_avatar(self):
         try:
-            if os.path.exists(ICON_FILENAME):
-                img = tk.PhotoImage(file=ICON_FILENAME)
+            # FIX: Use resource_path so PyInstaller finds the image!
+            icon_path = self.resource_path(ICON_FILENAME)
+            if os.path.exists(icon_path):
+                img = tk.PhotoImage(file=icon_path)
                 w, h = img.width(), img.height()
                 scale = max(1, int(w/48))
                 self.icon_img = img.subsample(scale, scale)
@@ -295,7 +290,11 @@ class OSKCommanderPro(tk.Tk):
         self.jump()
         self.check_remote_path_fallback()
         dest = self.local_var.get()
-        if not dest: return
+        
+        # FIX: Shout if empty!
+        if not dest: 
+            messagebox.showwarning("Missing Destination", "You must select a folder on your PC to save the files!")
+            return
         
         if not self.current_log_file:
             ts = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
