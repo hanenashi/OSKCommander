@@ -1,0 +1,19 @@
+# Python debris
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local User Data (Don't commit these!)
+logs/
+osk_settings.json
+
+# Binaries (Too big/Platform specific for source repo)
+# We will download/add these only for the release build
+adb.exe
+AdbWinApi.dll
+AdbWinUsbApi.dll
+
+# PyInstaller / Build artifacts
+build/
+dist/
+*.spec
